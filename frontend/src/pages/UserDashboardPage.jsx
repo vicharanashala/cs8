@@ -87,17 +87,17 @@ export default function UserDashboardPage() {
       )}
 
       {myStats && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '0.75rem', marginBottom: '1.75rem' }}>
-          <StatCard icon="📝" label="My Queries" value={myStats.totalQueries || 0} sub="total raised" color="var(--primary)" />
-          <StatCard icon="🟡" label="Open" value={myStats.openQueries || 0} sub="awaiting response" color="#f59e0b" />
-          <StatCard icon="✅" label="Resolved" value={myStats.resolvedQueries || 0} sub="answered" color="#10b981" />
-          <StatCard icon="🏆" label="Reputation" value={myStats.stats?.reputationPoints || 0} sub="points earned" color="#f97316" />
-        </div>
-
-      <section style={{ marginBottom: '1.75rem' }}>
-        <TopFAQsWidget showTitle={true} />
-      </section>
-
+        <>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '0.75rem', marginBottom: '1.75rem' }}>
+            <StatCard icon="📝" label="My Queries" value={myStats.totalQueries || 0} sub="total raised" color="var(--primary)" />
+            <StatCard icon="🟡" label="Open" value={myStats.openQueries || 0} sub="awaiting response" color="#f59e0b" />
+            <StatCard icon="✅" label="Resolved" value={myStats.resolvedQueries || 0} sub="answered" color="#10b981" />
+            <StatCard icon="🏆" label="Reputation" value={myStats.stats?.reputationPoints || 0} sub="points earned" color="#f97316" />
+          </div>
+          <section style={{ marginBottom: '1.75rem' }}>
+            <TopFAQsWidget showTitle={true} />
+          </section>
+        </>
       )}
 
       <div style={{ marginBottom: '1.75rem' }}>
