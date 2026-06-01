@@ -136,7 +136,7 @@ function TopFAQItem({ faq, onToggle, isExpanded, userVote, onVote }) {
   );
 }
 
-export default function TopFAQsWidget({ limit = 10, showTitle = true, style = {} }) {
+export default function TopFAQsWidget({ limit = 10, showTitle = true, style = {}, category }) {
   const [data, setData] = useState({ faqs: [], count: 0 });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -145,7 +145,9 @@ export default function TopFAQsWidget({ limit = 10, showTitle = true, style = {}
   const [voteLoading, setVoteLoading] = useState(null);
 
   useEffect(() => {
-    fetch(`${API}?limit=${limit}`)
+    const params = new URLSearchParams({ limit: String(limit) });
+    if (category && category !== 'all') params.set('category', category);
+    fetch(`${API}?${params.toString()}`)
       .then(res => {
         if (!res.ok) throw new Error('Failed to load');
         return res.json();
@@ -158,7 +160,7 @@ export default function TopFAQsWidget({ limit = 10, showTitle = true, style = {}
         setError('Could not load top FAQs');
         setLoading(false);
       });
-  }, [limit]);
+  }, [limit, category]);
 
   // When widget opens, fetch user vote for each visible FAQ
   const handleToggle = async (faqId) => {

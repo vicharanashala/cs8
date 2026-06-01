@@ -30,13 +30,15 @@ exports.getFAQs = asyncHandler(async (req, res) => {
     query = FAQ.find(filter);
   }
 
+  const sortKey = sort === 'useful' ? 'helpful' : sort;
   const sortMap = {
     newest: { createdAt: -1 },
     oldest: { createdAt: 1 },
-    helpful: { helpful: -1 },
-    views: { viewCount: -1 },
+    helpful: { helpful: -1, viewCount: -1, createdAt: -1 },
+    views: { viewCount: -1, helpful: -1 },
+    rated: { averageRating: -1, ratingCount: -1, helpful: -1 },
   };
-  query = query.sort(sortMap[sort] || { createdAt: -1 });
+  query = query.sort(sortMap[sortKey] || sortMap.newest);
   const faqs = await query;
   res.json({ success: true, count: faqs.length, data: faqs });
 });

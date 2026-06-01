@@ -1,5 +1,4 @@
-﻿import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+﻿import { useState, useEffect, useCallback, useRef } from 'react';
 import TopFAQsWidget from '../components/faq/TopFAQsWidget';
 
 const API = '/api/faqs';
@@ -8,6 +7,14 @@ const CAT_API = '/api/categories';
 function getToken() {
   return localStorage.getItem('faq_access_token');
 }
+
+const SORT_OPTIONS = [
+  { value: 'helpful', label: '⭐ Most Useful' },
+  { value: 'newest', label: '🕐 Newest' },
+  { value: 'views', label: '👁 Most Viewed' },
+  { value: 'rated', label: '★ Top Rated' },
+  { value: 'oldest', label: '🕘 Oldest' },
+];
 
 function VoteButtons({ faqId, helpful, notHelpful, myVote, onVote }) {
   return (
@@ -34,13 +41,15 @@ function VoteButtons({ faqId, helpful, notHelpful, myVote, onVote }) {
   );
 }
 
-function FAQCard({ faq, isExpanded, onToggle, onVote, userVote }) {
+function FAQCard({ faq, isExpanded, onToggle, onVote, userVote, categoryLabel }) {
   const [isOpen, setIsOpen] = useState(false);
 
   useEffect(() => {
     if (isExpanded === faq._id) setIsOpen(true);
     else setIsOpen(false);
   }, [isExpanded, faq._id]);
+
+  const catDisplay = categoryLabel(faq.category);
 
   return (
     <div
@@ -59,9 +68,9 @@ function FAQCard({ faq, isExpanded, onToggle, onVote, userVote }) {
               <span className="q-icon">Q</span>
               <span>{faq.question}</span>
             </div>
-            {faq.category && faq.category !== 'other' && (
+            {faq.category && (
               <div style={{ marginBottom: '0.5rem', marginLeft: '1.7rem' }}>
-                <span className="tag">{faq.category}</span>
+                <span className="tag">{catDisplay}</span>
               </div>
             )}
             <div style={{
@@ -81,6 +90,7 @@ function FAQCard({ faq, isExpanded, onToggle, onVote, userVote }) {
               {(faq.tags || []).map(t => <span key={t} className="tag">{t}</span>)}
               <span style={{ marginLeft: 'auto', fontSize: '0.78rem', color: 'var(--text-muted)' }}>
                 👁 {faq.viewCount || 0}
+                {faq.averageRating > 0 && ` · ★ ${faq.averageRating}`}
               </span>
             </div>
             <VoteButtons
@@ -109,8 +119,8 @@ function FAQCard({ faq, isExpanded, onToggle, onVote, userVote }) {
               <span style={{ color: 'var(--primary)', fontWeight: 800, flexShrink: 0 }}>Q</span>
               <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{faq.question}</span>
             </div>
-            <div style={{ display: 'flex', gap: '0.4rem', marginTop: '0.35rem', alignItems: 'center' }}>
-              {faq.category && faq.category !== 'other' && <span className="tag" style={{ fontSize: '0.7rem' }}>{faq.category}</span>}
+            <div style={{ display: 'flex', gap: '0.4rem', marginTop: '0.35rem', alignItems: 'center', flexWrap: 'wrap' }}>
+              {faq.category && <span className="tag" style={{ fontSize: '0.7rem' }}>{catDisplay}</span>}
               <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>👍 {faq.helpful || 0}</span>
             </div>
           </div>
@@ -121,54 +131,61 @@ function FAQCard({ faq, isExpanded, onToggle, onVote, userVote }) {
   );
 }
 
-const SORT_OPTIONS = [
-  { value: 'newest', label: '🕐 Newest' },
-  { value: 'helpful', label: '👍 Most Helpful' },
-  { value: 'views', label: '👁 Most Viewed' },
-  { value: 'oldest', label: '🕘 Oldest' },
-];
-
 export default function FAQPage() {
-  const navigate = useNavigate();
   const [faqs, setFaqs] = useState([]);
   const [categories, setCategories] = useState([]);
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [activeCategory, setActiveCategory] = useState('all');
   const [loading, setLoading] = useState(true);
   const [expandedId, setExpandedId] = useState(null);
   const [userVotes, setUserVotes] = useState({});
-  const [sort, setSort] = useState('newest');
+  const [sort, setSort] = useState('helpful');
+  const searchTimer = useRef(null);
 
-  useEffect(() => { fetchFAQs(); fetchCategories(); }, []);
-  useEffect(() => { fetchFAQs(activeCategory); }, [activeCategory]);
+  useEffect(() => {
+    fetch(CAT_API)
+      .then(r => r.json())
+      .then(data => { if (data.success) setCategories(data.data || []); })
+      .catch(() => {});
+  }, []);
 
-  const fetchFAQs = async (cat) => {
+  useEffect(() => {
+    if (searchTimer.current) clearTimeout(searchTimer.current);
+    searchTimer.current = setTimeout(() => setDebouncedSearch(search.trim()), 350);
+    return () => clearTimeout(searchTimer.current);
+  }, [search]);
+
+  const categoryLabel = useCallback((name) => {
+    if (!name) return 'Other';
+    const c = categories.find(x => x.name === name);
+    return c ? `${c.icon || ''} ${c.displayName}`.trim() : name;
+  }, [categories]);
+
+  const fetchFAQs = useCallback(async () => {
+    setLoading(true);
     try {
       const params = new URLSearchParams();
-      if (cat && cat !== 'all') params.set('category', cat);
+      if (activeCategory && activeCategory !== 'all') params.set('category', activeCategory);
+      if (debouncedSearch) params.set('search', debouncedSearch);
       params.set('sort', sort);
-      const url = `${API}?${params.toString()}`;
-      const res = await fetch(url);
+      const res = await fetch(`${API}?${params.toString()}`);
       const data = await res.json();
       if (res.ok) setFaqs(data.data || []);
-    } catch { /* silent */ } finally { setLoading(false); }
-  };
+    } catch {
+      setFaqs([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [activeCategory, debouncedSearch, sort]);
 
-  const fetchCategories = async () => {
-    try {
-      const res = await fetch(CAT_API);
-      const data = await res.json();
-      if (res.ok) setCategories(data.data || []);
-    } catch { /* silent */ }
-  };
+  useEffect(() => {
+    fetchFAQs();
+  }, [fetchFAQs]);
 
   const open = (id) => setExpandedId(prev => prev === id ? null : id);
 
-  const filtered = faqs.filter(f =>
-    f.question.toLowerCase().includes(search.toLowerCase()) ||
-    (f.answer || '').toLowerCase().includes(search.toLowerCase()) ||
-    (f.tags || []).some(t => t.toLowerCase().includes(search.toLowerCase()))
-  );
+  const activeSortLabel = SORT_OPTIONS.find(o => o.value === sort)?.label || 'Sorted';
 
   const fetchMyVote = async (faqId) => {
     const token = getToken();
@@ -189,7 +206,7 @@ export default function FAQPage() {
     if (!token) return;
 
     const prev = userVotes[faqId] || null;
-    setFaqs(prev => prev.map(f => {
+    setFaqs(prevList => prevList.map(f => {
       if (f._id !== faqId) return f;
       let { helpful, notHelpful } = f;
       if (prev === 'helpful') helpful = Math.max(0, helpful - 1);
@@ -212,7 +229,7 @@ export default function FAQPage() {
         });
         const data = await res.json();
         if (res.ok) {
-          setFaqs(prev => prev.map(f => f._id === faqId ? { ...f, helpful: data.data.helpful, notHelpful: data.data.notHelpful } : f));
+          setFaqs(prevList => prevList.map(f => f._id === faqId ? { ...f, helpful: data.data.helpful, notHelpful: data.data.notHelpful } : f));
           setUserVotes(prev => ({ ...prev, [faqId]: data.data.myVote || actualVote }));
         }
       } else {
@@ -220,7 +237,7 @@ export default function FAQPage() {
         setUserVotes(prev => ({ ...prev, [faqId]: null }));
       }
     } catch {
-      fetchFAQs(activeCategory);
+      fetchFAQs();
       setUserVotes(prev => ({ ...prev, [faqId]: prev[faqId] || null }));
     }
   };
@@ -237,40 +254,43 @@ export default function FAQPage() {
         <p>Find answers to the most common questions from the community</p>
       </div>
 
-      {/* Top 10 Most Helpful FAQs — pinned above the full list */}
-      <TopFAQsWidget limit={10} />
+      <TopFAQsWidget
+        limit={10}
+        category={activeCategory !== 'all' ? activeCategory : undefined}
+      />
 
-      {/* Search + Sort bar */}
-      <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1.25rem', alignItems: 'center', flexWrap: 'wrap' }}>
-        <div className="search-bar" style={{ flex: 1, minWidth: '200px' }}>
+      <div className="faq-panel-toolbar">
+        <div className="search-bar">
           <input
             type="search"
-            placeholder="🔍 Filter FAQs by keyword…"
+            placeholder="🔍 Search FAQs by keyword…"
             value={search}
             onChange={e => setSearch(e.target.value)}
-            aria-label="Filter FAQs"
+            aria-label="Search FAQs"
           />
         </div>
 
-        {/* Sort control */}
-        <div style={{ display: 'flex', gap: '0.35rem', alignItems: 'center' }}>
-          <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>Sort:</span>
-          {SORT_OPTIONS.map(opt => (
-            <button
-              key={opt.value}
-              onClick={() => setSort(opt.value)}
-              className={`btn btn-sm ${sort === opt.value ? 'btn-primary' : 'btn-ghost'}`}
-              aria-pressed={sort === opt.value}
-            >
-              {opt.label}
-            </button>
-          ))}
+        <div className="faq-sort-panel" role="group" aria-label="Sort FAQs">
+          <span className="faq-sort-panel-label">Sort by</span>
+          <div className="faq-sort-tabs">
+            {SORT_OPTIONS.map(opt => (
+              <button
+                key={opt.value}
+                type="button"
+                className={`faq-sort-tab ${sort === opt.value ? 'active' : ''}`}
+                onClick={() => setSort(opt.value)}
+                aria-pressed={sort === opt.value}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
-      {/* Category filter tabs */}
-      <nav aria-label="FAQ categories" style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '1.25rem', alignItems: 'center' }}>
+      <nav className="faq-category-tabs" aria-label="FAQ categories">
         <button
+          type="button"
           onClick={() => setActiveCategory('all')}
           className={`btn btn-sm ${activeCategory === 'all' ? 'btn-primary' : 'btn-ghost'}`}
           aria-pressed={activeCategory === 'all'}
@@ -280,6 +300,7 @@ export default function FAQPage() {
         {categories.map(cat => (
           <button
             key={cat._id}
+            type="button"
             onClick={() => setActiveCategory(cat.name)}
             className={`btn btn-sm ${activeCategory === cat.name ? 'btn-primary' : 'btn-ghost'}`}
             aria-pressed={activeCategory === cat.name}
@@ -294,32 +315,32 @@ export default function FAQPage() {
         ))}
       </nav>
 
-      {/* Section heading */}
       <section aria-label="All FAQs">
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
           <span style={{ fontSize: '1.1rem' }}>📋</span>
           <h2 style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--text)', margin: 0 }}>
             {activeCategory !== 'all'
               ? `${categories.find(c => c.name === activeCategory)?.displayName || activeCategory} FAQs`
               : 'All FAQs'}
           </h2>
+          <span className="tag" style={{ fontSize: '0.72rem' }}>{activeSortLabel}</span>
           {!loading && (
             <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginLeft: '0.25rem' }}>
-              ({filtered.length})
+              ({faqs.length})
             </span>
           )}
         </div>
 
         {loading ? (
           <div className="empty-state"><div className="icon">⏳</div><p>Loading FAQs…</p></div>
-        ) : filtered.length === 0 ? (
+        ) : faqs.length === 0 ? (
           <div className="empty-state">
             <div className="icon">🔎</div>
-            <p>{search ? 'No FAQs match your search' : 'No FAQs in this category yet.'}</p>
+            <p>{debouncedSearch || search ? 'No FAQs match your search' : 'No FAQs in this category yet.'}</p>
           </div>
         ) : (
           <div className="card-grid">
-            {filtered.map(faq => (
+            {faqs.map(faq => (
               <FAQCard
                 key={faq._id}
                 faq={faq}
@@ -327,6 +348,7 @@ export default function FAQPage() {
                 onToggle={handleToggle}
                 onVote={handleVote}
                 userVote={userVotes[faq._id]}
+                categoryLabel={categoryLabel}
               />
             ))}
           </div>
