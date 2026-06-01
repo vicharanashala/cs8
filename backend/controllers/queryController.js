@@ -242,18 +242,25 @@ exports.rejectSolution = asyncHandler(async (req, res) => {
 
   const query = await Query.findById(req.params.id);
   if (!query) throw ApiError.notFound('Query not found');
-  if (!['open', 'assigned', 'pending_approval'].includes(query.status)) {
-    throw ApiError.badRequest(`Cannot reject a query in "${query.status}" status`);
+  if (query.status !== 'pending_approval') {
+    throw ApiError.badRequest(`Can only reject solutions awaiting review (current: "${query.status}")`);
   }
 
-  query.status = 'rejected';
+  query.status = 'open';
   query.adminNote = adminNote || '';
   query.communitySolution = '';
   query.solutionBy = null;
   query.solutionSubmittedAt = null;
+  query.solutionScreenshot = null;
+  query.assignedTo = undefined;
 
   await query.save();
-  res.json({ success: true, data: query });
+
+  const populated = await Query.findById(query._id)
+    .populate('raisedBy', 'name email')
+    .populate('solutionBy', 'name');
+
+  res.json({ success: true, message: 'Solution rejected. Query reopened for new responses.', data: populated });
 });
 
 // @route   PUT /api/queries/:id/close

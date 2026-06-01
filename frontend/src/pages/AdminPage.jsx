@@ -238,6 +238,9 @@ function QueryReviewSection() {
   const [queries, setQueries] = useState([]);
   const [msg, setMsg] = useState(null);
   const [approvingId, setApprovingId] = useState(null);
+  const [rejectingId, setRejectingId] = useState(null);
+  const [rejectNote, setRejectNote] = useState('');
+  const [rejecting, setRejecting] = useState(false);
   const [faqTags, setFaqTags] = useState('');
   const [adminNote, setAdminNote] = useState('');
   const [mergeModal, setMergeModal] = useState(null);
@@ -265,13 +268,30 @@ function QueryReviewSection() {
     } catch (err) { setMsg({ type: 'error', text: err.message }); }
   };
 
+  const startReject = (id) => {
+    setRejectingId(id);
+    setRejectNote('');
+    setApprovingId(null);
+    setFaqTags('');
+    setAdminNote('');
+  };
+
   const handleReject = async (id) => {
-    const note = prompt('Reason for rejection (optional):') || '';
+    setRejecting(true);
     try {
-      await apiFetch(`/api/queries/${id}/reject`, { method: 'PUT', body: { adminNote: note } });
-      setMsg({ type: 'info', text: '↩️ Solution rejected. Query reopened.' });
+      await apiFetch(`/api/queries/${id}/reject`, {
+        method: 'PUT',
+        body: { adminNote: rejectNote.trim() },
+      });
+      setMsg({ type: 'success', text: '↩️ Solution rejected. Query reopened for new responses.' });
+      setRejectingId(null);
+      setRejectNote('');
       fetchQueries();
-    } catch (err) { setMsg({ type: 'error', text: err.message }); }
+    } catch (err) {
+      setMsg({ type: 'error', text: err.message || err.data?.message || 'Failed to reject solution' });
+    } finally {
+      setRejecting(false);
+    }
   };
 
   const handleDelete = async (id) => {
@@ -375,10 +395,40 @@ function QueryReviewSection() {
                     <button className="btn btn-ghost" onClick={() => { setApprovingId(null); setFaqTags(''); setAdminNote(''); }}>Cancel</button>
                   </div>
                 </div>
+              ) : rejectingId === q._id ? (
+                <div>
+                  <div className="form-group">
+                    <label>Reason for rejection (optional)</label>
+                    <textarea
+                      value={rejectNote}
+                      onChange={e => setRejectNote(e.target.value)}
+                      placeholder="Explain what needs to be improved..."
+                      style={{ minHeight: '72px' }}
+                    />
+                  </div>
+                  <div className="flex flex-gap flex-wrap">
+                    <button
+                      type="button"
+                      className="btn btn-danger"
+                      disabled={rejecting}
+                      onClick={() => handleReject(q._id)}
+                    >
+                      {rejecting ? 'Rejecting…' : '❌ Confirm Reject'}
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-ghost"
+                      disabled={rejecting}
+                      onClick={() => { setRejectingId(null); setRejectNote(''); }}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
               ) : (
                 <div className="flex flex-gap flex-wrap">
-                  <button className="btn btn-accent btn-sm" onClick={() => setApprovingId(q._id)}>✅ Approve</button>
-                  <button className="btn btn-danger btn-sm" onClick={() => handleReject(q._id)}>❌ Reject</button>
+                  <button className="btn btn-accent btn-sm" onClick={() => { setApprovingId(q._id); setRejectingId(null); }}>✅ Approve</button>
+                  <button className="btn btn-danger btn-sm" onClick={() => startReject(q._id)}>❌ Reject</button>
                   <button className="btn btn-ghost btn-sm" onClick={() => findSimilar(q)}>🔗 Find Duplicates</button>
                   <button className="btn btn-ghost btn-sm" onClick={() => handleDelete(q._id)}>Delete</button>
                 </div>

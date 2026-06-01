@@ -10,8 +10,6 @@ import LoginPage from './pages/LoginPage';
 import LeaderboardPage from './pages/LeaderboardPage';
 import FAQSearchPage from './pages/FAQSearchPage';
 import AdminAnalyticsPage from './pages/admin/AdminAnalyticsPage';
-import UserDashboardPage from './pages/UserDashboardPage';
-
 // ── Theme Context ────────────────────────────────────────────────────────────
 const ThemeContext = createContext(null);
 
@@ -55,7 +53,6 @@ function NavBar() {
       <a href="/" className="navbar-brand"><span>❓</span> <span>FAQ</span><span>Hub</span></a>
       <ul className="navbar-links">
         <li><NavLink to="/" end>FAQ</NavLink></li>
-        <li><NavLink to="/dashboard">Dashboard</NavLink></li>
         <li><NavLink to="/raise">Raise Query</NavLink></li>
         <li><NavLink to="/resolve">Resolve</NavLink></li>
         {admin ? (
@@ -125,7 +122,6 @@ export default function App() {
             <div className="main-content">
               <Routes>
             <Route path="/"               element={<FAQPage />} />
-            <Route path="/dashboard"      element={<UserDashboardPage />} />
             <Route path="/raise"          element={<RaiseQueryPage />} />
                 <Route path="/resolve"        element={<QueryResolvePage />} />
                 <Route path="/login"          element={<LoginPage />} />
