@@ -33,6 +33,7 @@ const STATUS_CLASS = {
 
 export default function QueryResolvePage() {
   const [queries, setQueries] = useState([]);
+  const [categories, setCategories] = useState([]);
   const [filter, setFilter] = useState('open');
   const [solvingId, setSolvingId] = useState(null);
   const [solution, setSolution] = useState('');
@@ -46,14 +47,25 @@ export default function QueryResolvePage() {
   useEffect(() => {
     const user = parseUser();
     setCurrentUser(user);
+    fetch('/api/categories')
+      .then(r => r.json())
+      .then(data => { if (data.success) setCategories(data.data || []); })
+      .catch(() => {});
   }, []);
 
   useEffect(() => { fetchQueries(); }, [filter]);
 
+  const categoryLabel = (name) => {
+    if (!name) return 'Other';
+    const c = categories.find(x => x.name === name);
+    return c ? `${c.icon || ''} ${c.displayName}`.trim() : name;
+  };
+
   const fetchQueries = async () => {
     const token = getToken();
-    const url = filter === 'all' ? '/api/queries' : `/api/queries?status=${filter}`;
-    const res = await fetch(url, token ? { headers: { Authorization: `Bearer ${token}` } } : {});
+    const params = new URLSearchParams({ scope: 'community' });
+    if (filter !== 'all') params.set('status', filter);
+    const res = await fetch(`/api/queries?${params}`, token ? { headers: { Authorization: `Bearer ${token}` } } : {});
     const data = await res.json();
     if (res.ok) setQueries(data.data || []);
   };
@@ -151,7 +163,7 @@ export default function QueryResolvePage() {
                   <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>
                     By <strong>{typeof q.raisedBy === 'object' ? q.raisedBy?.name : (q.raisedBy || 'Anonymous')}</strong>
                     {' · '}{new Date(q.createdAt).toLocaleDateString()}
-                    {q.category && <span className="tag" style={{ marginLeft: '0.4rem', fontSize: '0.7rem' }}>{q.category}</span>}
+                    <span className="tag" style={{ marginLeft: '0.4rem', fontSize: '0.7rem' }}>{categoryLabel(q.category)}</span>
                   </div>
                   <div style={{ marginTop: '0.4rem', display: 'flex', gap: '0.4rem', alignItems: 'center', flexWrap: 'wrap' }}>
                     <span className={`status-badge ${STATUS_CLASS[q.status] || ''}`}>
@@ -228,15 +240,15 @@ export default function QueryResolvePage() {
               )}
 
               {/* Submit solution */}
-              {q.status === 'open' && solvingId !== q._id && (
+              {(q.status === 'open' || q.status === 'rejected') && solvingId !== q._id && (
                 <button className="btn btn-accent btn-sm" style={{ marginTop: '1rem' }}
                   onClick={() => { setSolvingId(q._id); setMsg(null); }}>
-                  ✍️ Submit Solution
+                  {q.status === 'rejected' ? '✍️ Submit Revised Solution' : '✍️ Submit Solution'}
                 </button>
               )}
 
               {/* Solution form */}
-              {q.status === 'open' && solvingId === q._id && (
+              {(q.status === 'open' || q.status === 'rejected') && solvingId === q._id && (
                 <div style={{ marginTop: '1rem' }}>
                   <div className="form-group">
                     <label>Your Solution *</label>

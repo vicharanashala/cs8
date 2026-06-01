@@ -236,6 +236,8 @@ function FAQSection() {
 // ── Query Review ─────────────────────────────────────────────────────────────
 function QueryReviewSection() {
   const [queries, setQueries] = useState([]);
+  const [categories, setCategories] = useState([]);
+  const [categoryFilter, setCategoryFilter] = useState('all');
   const [msg, setMsg] = useState(null);
   const [approvingId, setApprovingId] = useState(null);
   const [rejectingId, setRejectingId] = useState(null);
@@ -248,11 +250,20 @@ function QueryReviewSection() {
   const [similarQueries, setSimilarQueries] = useState([]);
   const [findingSimilar, setFindingSimilar] = useState(false);
 
-  useEffect(() => { fetchQueries(); }, []);
+  useEffect(() => {
+    fetchQueries();
+    apiFetch('/api/categories').then(data => setCategories(data.data || [])).catch(() => {});
+  }, []);
+
+  const categoryLabel = (name) => {
+    if (!name) return 'Other';
+    const c = categories.find(x => x.name === name);
+    return c ? `${c.icon || ''} ${c.displayName}`.trim() : name;
+  };
 
   const fetchQueries = async () => {
     try {
-      const data = await apiFetch('/api/queries');
+      const data = await apiFetch('/api/queries?scope=community');
       setQueries(data.data || data || []);
     } catch { setMsg({ type: 'error', text: 'Failed to load queries' }); }
   };
@@ -283,7 +294,7 @@ function QueryReviewSection() {
         method: 'PUT',
         body: { adminNote: rejectNote.trim() },
       });
-      setMsg({ type: 'success', text: '↩️ Solution rejected. Query reopened for new responses.' });
+      setMsg({ type: 'success', text: '❌ Solution rejected. Query moved to Rejected.' });
       setRejectingId(null);
       setRejectNote('');
       fetchQueries();
@@ -326,8 +337,14 @@ function QueryReviewSection() {
     } catch (err) { setMsg({ type: 'error', text: err.message }); }
   };
 
-  const pendingApproval = queries.filter(q => q.status === 'pending_approval');
-  const other = queries.filter(q => q.status !== 'pending_approval');
+  const matchesCategory = (q) => categoryFilter === 'all' || q.category === categoryFilter;
+
+  const pendingApproval = queries.filter(q => q.status === 'pending_approval' && matchesCategory(q));
+  const rejectedQueries = queries.filter(q => q.status === 'rejected' && matchesCategory(q));
+  const other = queries.filter(q => !['pending_approval', 'rejected'].includes(q.status) && matchesCategory(q));
+
+  const pendingCountByCategory = (catName) =>
+    queries.filter(q => q.status === 'pending_approval' && (catName === 'all' || q.category === catName)).length;
 
   const STATUS_BADGE = (s) => {
     const map = { open: 'status-pending', assigned: 'status-pending', pending_approval: 'tag-pending', resolved: 'status-solved', rejected: 'status-rejected' };
@@ -353,8 +370,33 @@ function QueryReviewSection() {
       <h2 className="section-title">🔬 Query Review Queue</h2>
       {msg && <div className={`alert alert-${msg.type}`}>{msg.text}</div>}
 
+      <div style={{ marginBottom: '1.25rem' }}>
+        <div style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '0.5rem' }}>
+          Filter by category
+        </div>
+        <div className="flex flex-gap flex-wrap">
+          <button
+            type="button"
+            className={`btn btn-sm ${categoryFilter === 'all' ? 'btn-primary' : 'btn-ghost'}`}
+            onClick={() => setCategoryFilter('all')}
+          >
+            All ({pendingCountByCategory('all')})
+          </button>
+          {categories.map(c => (
+            <button
+              key={c._id}
+              type="button"
+              className={`btn btn-sm ${categoryFilter === c.name ? 'btn-primary' : 'btn-ghost'}`}
+              onClick={() => setCategoryFilter(c.name)}
+            >
+              {c.icon} {c.displayName} ({pendingCountByCategory(c.name)})
+            </button>
+          ))}
+        </div>
+      </div>
+
       <h3 style={{ fontSize: '0.85rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-muted)', marginBottom: '0.75rem' }}>
-        🔵 Awaiting Your Review ({pendingApproval.length})
+        🔵 Awaiting Your Review — {categoryFilter === 'all' ? 'All categories' : categoryLabel(categoryFilter)} ({pendingApproval.length})
       </h3>
 
       {pendingApproval.length === 0 ? (
@@ -365,9 +407,12 @@ function QueryReviewSection() {
             <div key={q._id} className="card" style={{ border: '1px solid #bfdbfe', background: '#f0f9ff' }}>
               <div style={{ fontWeight: 600, fontSize: '1.05rem', marginBottom: '0.4rem' }}>{q.question}</div>
               {q.description && <div style={{ fontSize: '0.88rem', color: 'var(--text-muted)', marginBottom: '0.5rem' }}>{q.description}</div>}
-              <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.75rem' }}>
-                Raised by <strong>{typeof q.raisedBy === 'object' ? q.raisedBy?.name : (q.raisedBy || 'Unknown')}</strong>
-                {' · '}{new Date(q.createdAt).toLocaleDateString()}
+              <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.75rem', display: 'flex', flexWrap: 'wrap', gap: '0.4rem', alignItems: 'center' }}>
+                <span>
+                  Raised by <strong>{typeof q.raisedBy === 'object' ? q.raisedBy?.name : (q.raisedBy || 'Unknown')}</strong>
+                  {' · '}{new Date(q.createdAt).toLocaleDateString()}
+                </span>
+                <span className="tag">{categoryLabel(q.category)}</span>
               </div>
 
               {q.communitySolution && (
@@ -438,6 +483,31 @@ function QueryReviewSection() {
         </div>
       )}
 
+      <h3 style={{ fontSize: '0.85rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#991b1b', marginBottom: '0.75rem', marginTop: '1.5rem' }}>
+        ❌ Rejected ({rejectedQueries.length})
+      </h3>
+      {rejectedQueries.length === 0 ? (
+        <p style={{ color: 'var(--text-muted)', fontSize: '0.88rem', marginBottom: '1.5rem' }}>No rejected queries in this category.</p>
+      ) : (
+        <table className="admin-table" style={{ marginBottom: '1.5rem' }}>
+          <thead><tr><th>Question</th><th>Category</th><th>Raised By</th><th>Admin Note</th><th>Actions</th></tr></thead>
+          <tbody>
+            {rejectedQueries.map(q => (
+              <tr key={q._id}>
+                <td style={{ fontWeight: 500, maxWidth: '200px' }} className="truncate">{q.question}</td>
+                <td><span className="tag">{categoryLabel(q.category)}</span></td>
+                <td>{typeof q.raisedBy === 'object' ? q.raisedBy?.name : (q.raisedBy || '—')}</td>
+                <td style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>{q.adminNote || '—'}</td>
+                <td className="actions">
+                  <button className="btn btn-ghost btn-sm" onClick={() => findSimilar(q)}>🔗</button>
+                  <button className="btn btn-danger btn-sm" onClick={() => handleDelete(q._id)}>Delete</button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+
       <h3 style={{ fontSize: '0.85rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-muted)', marginBottom: '0.75rem' }}>
         All Other Queries ({other.length})
       </h3>
@@ -445,11 +515,12 @@ function QueryReviewSection() {
         <p style={{ color: 'var(--text-muted)', fontSize: '0.88rem' }}>No other queries.</p>
       ) : (
         <table className="admin-table">
-          <thead><tr><th>Question</th><th>Raised By</th><th>Status</th><th>Added to FAQ</th><th>Actions</th></tr></thead>
+          <thead><tr><th>Question</th><th>Category</th><th>Raised By</th><th>Status</th><th>Added to FAQ</th><th>Actions</th></tr></thead>
           <tbody>
             {other.map(q => (
               <tr key={q._id}>
                 <td style={{ fontWeight: 500, maxWidth: '200px' }} className="truncate">{q.question}</td>
+                <td><span className="tag">{categoryLabel(q.category)}</span></td>
                 <td>{typeof q.raisedBy === 'object' ? q.raisedBy?.name : (q.raisedBy || '—')}</td>
                 <td><span className={STATUS_BADGE(q.status)}>{STATUS_LABEL(q.status)}</span></td>
                 <td>{q.addedToFAQ ? '✅' : '❌'}</td>

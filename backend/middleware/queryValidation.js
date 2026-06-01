@@ -23,8 +23,8 @@ const priorityValidation = body('priority')
   .isIn(['low', 'medium', 'high', 'urgent']).withMessage('Invalid priority');
 
 const categoryValidation = body('category')
-  .optional()
-  .trim();
+  .trim()
+  .notEmpty().withMessage('Please select a category');
 
 /**
  * Custom validator — runs after express-validator chain.
@@ -67,12 +67,16 @@ const spamAndQualityCheck = async (req, _res, next) => {
  * Validate that category is valid
  */
 const categoryCheck = async (req, _res, next) => {
-  const validCategories = ['academics', 'admission', 'fees', 'placement', 'facilities', 'other'];
-  const cat = req.body.category;
-  if (cat && !validCategories.includes(cat)) {
-    req.validationError = `Invalid category. Must be one of: ${validCategories.join(', ')}`;
+  const Category = require('../models/Category');
+  const { QUERY_CATEGORIES } = require('../models/Query');
+  const cats = await Category.find().select('name').lean();
+  const validCategories = cats.length > 0 ? cats.map((c) => c.name) : QUERY_CATEGORIES;
+  const cat = String(req.body.category || '').toLowerCase().trim();
+  if (!validCategories.includes(cat)) {
+    req.validationError = `Invalid category. Please choose a valid category.`;
     return next();
   }
+  req.body.category = cat;
   next();
 };
 

@@ -74,7 +74,13 @@ export default function RaiseQueryPage() {
     try {
       const res = await fetch('/api/categories');
       const data = await res.json();
-      if (res.ok) setCategories(data.data || []);
+      if (res.ok && data.data?.length) {
+        setCategories(data.data);
+        setForm(f => ({
+          ...f,
+          category: f.category === 'other' ? data.data[0].name : f.category,
+        }));
+      }
     } catch { /* silent */ }
   };
 
@@ -349,6 +355,7 @@ export default function RaiseQueryPage() {
                   <select
                     id="category-select"
                     value={form.category}
+                    required
                     onChange={e => { set('category', e.target.value); setAutoCategory(null); }}
                   >
                     {categories.length > 0 ? (

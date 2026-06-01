@@ -7,6 +7,7 @@ const { ROLES } = require('../utils/roles');
 const { classifyQuery } = require('../utils/classifier');
 const { trigramSimilarity } = require('../utils/similarity');
 const { awardPoints } = require('../utils/reputation');
+const { getValidCategoryNames, normalizeQueryCategory } = require('../utils/queryCategories');
 
 // @route   GET /api/queries/similar
 // @desc    Find similar FAQs and open queries for duplicate detection
@@ -66,10 +67,11 @@ exports.classifyQuery = asyncHandler(async (req, res) => {
 // @desc    Get queries (role-filtered)
 // @access  Private
 exports.getQueries = asyncHandler(async (req, res) => {
-  const { status, category, priority } = req.query;
+  const { status, category, priority, scope } = req.query;
   const filter = {};
 
-  if (req.user?.role === ROLES.USER || req.user?.role === 'student') {
+  // scope=mine → only the caller's queries; scope=community → public board (resolve page)
+  if (scope === 'mine' && req.user) {
     filter.raisedBy = req.user._id;
   }
 
@@ -114,7 +116,8 @@ exports.raiseQuery = asyncHandler(async (req, res) => {
 
   if (!question || !question.trim()) throw ApiError.badRequest('Question is required');
 
-  let finalCategory = category || 'other';
+  const validCategories = await getValidCategoryNames();
+  const finalCategory = normalizeQueryCategory(category, validCategories);
 
   const screenshot = req.file ? `/uploads/${req.file.filename}` : null;
 
@@ -235,7 +238,7 @@ exports.approveSolution = asyncHandler(async (req, res) => {
 });
 
 // @route   PUT /api/queries/:id/reject
-// @desc    Reject solution — resets to open
+// @desc    Reject solution — marks query as rejected (not open)
 // @access  Private (staff+)
 exports.rejectSolution = asyncHandler(async (req, res) => {
   const { adminNote } = req.body;
@@ -246,13 +249,12 @@ exports.rejectSolution = asyncHandler(async (req, res) => {
     throw ApiError.badRequest(`Can only reject solutions awaiting review (current: "${query.status}")`);
   }
 
-  query.status = 'open';
+  query.status = 'rejected';
   query.adminNote = adminNote || '';
   query.communitySolution = '';
   query.solutionBy = null;
   query.solutionSubmittedAt = null;
   query.solutionScreenshot = null;
-  query.assignedTo = undefined;
 
   await query.save();
 
@@ -260,7 +262,7 @@ exports.rejectSolution = asyncHandler(async (req, res) => {
     .populate('raisedBy', 'name email')
     .populate('solutionBy', 'name');
 
-  res.json({ success: true, message: 'Solution rejected. Query reopened for new responses.', data: populated });
+  res.json({ success: true, message: 'Solution rejected.', data: populated });
 });
 
 // @route   PUT /api/queries/:id/close
