@@ -27,9 +27,7 @@ A polished, enterprise-grade **User Support Portal** built on the **MERN stack**
 - **FAQ Browse** — searchable, category-filtered accordion FAQ library with helpful/not-helpful voting
 - **Raise a Query** — submit queries with category auto-detection and duplicate detection
 - **My Queries** — track the status of all submitted queries in real time
-- **Personalized Dashboard** — stats, activity timeline, recommended FAQs, reputation score
 - **Community Discussions** — threaded replies on queries with upvotes and verified answers
-- **Leaderboard** — reputation-based ranking with milestone badges
 
 ### For Admins & Support Staff
 - **Admin Dashboard** — KPI cards, pending ticket queue, bulk actions, top FAQ analytics
@@ -40,11 +38,9 @@ A polished, enterprise-grade **User Support Portal** built on the **MERN stack**
 - **Analytics Dashboard** — query trends, FAQ performance, user growth, resolution times
 
 ### System-Wide
-- **Semantic Search** — intent-aware hybrid search (embedding + BM25 + RRF fusion) powered by `all-MiniLM-L6-v2` (ONNX, zero cost)
 - **Spam & Validation Filtering** — blocks meaningless submissions server- and client-side
 - **Most Helpful FAQs** — live top-10 ranking widget on dashboard and browse pages
 - **Dark Mode** — full dark/light theme toggle respecting `prefers-color-scheme`
-- **WCAG 2.1 AA Accessibility** — semantic HTML, keyboard navigation, ARIA, skip links
 
 ---
 
