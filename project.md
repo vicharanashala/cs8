@@ -188,7 +188,7 @@ From `backend/server.js`, mounted route groups:
 
 ### 5.2 Query Lifecycle
 - Users can raise categorized queries with priority and screenshot
-- Duplicate detection + semantic similarity support
+- Duplicate detection 
 - Community can submit solutions for review
 - Admin/staff can assign, approve, reject, close, or delete
 - Category-aware review in admin
@@ -200,7 +200,7 @@ From `backend/server.js`, mounted route groups:
 - Announcements management
 - Analytics dashboard
 
-### 5.4 Search and Semantic Features
+### 5.4 Search
 - Search endpoint with feedback collection
 - Search stats/logs for admin
 - Reindex and warm-index operations
