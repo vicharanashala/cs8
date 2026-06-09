@@ -389,23 +389,6 @@ All routes are prefixed with `/api`.
 
 ## 🔬 Advanced Features
 
-### 🧠 Semantic Search
-Hybrid search combining **dense vector similarity** (ONNX `all-MiniLM-L6-v2`, 384-dim) and **BM25 keyword matching**, fused via Reciprocal Rank Fusion (RRF). Zero external API dependency — runs entirely in-process via `@xenova/transformers`.
-
-Switch to OpenAI embeddings at any time with `EMBEDDING_PROVIDER=openai` in `.env`.
-
-### 🏆 Reputation & Badges
-Users earn points for community contributions:
-
-| Action | Points |
-|--------|--------|
-| Query resolved (as solver) | +10 |
-| Community post upvoted | +2 per upvote |
-| Solution verified by staff | +15 |
-| Spam attempt blocked | −5 |
-
-Badges include 🌟 First Answer, 🔥 Top Helper, 💯 Century, 🏆 Expert, 📚 FAQ Star, and 🎯 Streak Master.
-
 ### 🛡 Spam & Validation Filtering
 Server-side and client-side validation blocks: minimum length violations, all-caps text, repeated characters, common filler phrases, and rate limiting (max 5 queries per user per 24 hours).
 
